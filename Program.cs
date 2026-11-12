@@ -1,3 +1,5 @@
+using LabEquipmentApi.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +9,9 @@ builder.Services.AddOpenApi(options =>
 {
     options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_0;
 });
+
+builder.Services.AddDbContext<LabDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("LabDbConnection")));
 
 var app = builder.Build();
 
