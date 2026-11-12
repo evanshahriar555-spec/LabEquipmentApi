@@ -37,6 +37,10 @@ public partial class InitialCreate : Migration
                 { 2, "Laptop", "Lab 10", false },
                 { 3, "Monitor", "Lab 11", true }
             });
+
+        // HasData inserts explicit keys; move the PostgreSQL identity sequence past the seed IDs.
+        migrationBuilder.Sql(
+            "SELECT setval(pg_get_serial_sequence('\"EquipmentItems\"', 'Id'), (SELECT MAX(\"Id\") FROM \"EquipmentItems\"), true);");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

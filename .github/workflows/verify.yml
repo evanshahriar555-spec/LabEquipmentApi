@@ -37,7 +37,9 @@ jobs:
       - name: Build the project
         run: dotnet build LabEquipmentApi.slnx --no-restore --configuration Release
       - name: Install EF Core CLI
-        run: dotnet tool install --global dotnet-ef --version 10.0.11
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.11
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
       - name: Apply initial migration to PostgreSQL
         run: dotnet ef database update
       - name: Start HTTP API and check seeded endpoints
@@ -58,4 +60,14 @@ jobs:
           curl --fail --silent http://127.0.0.1:5095/api/equipment/available | grep -q 'Monitor'
           curl --fail --silent http://127.0.0.1:5095/api/equipment/room-summary | grep -q 'Lab 10'
           test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:5095/api/equipment/999)" = "404"
-          echo 'All read-only API checks passed.'
+          POST_STATUS=$(curl --silent --show-error --output /tmp/created.json --dump-header /tmp/created.headers --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' -d '{"name":"Keyboard","room":"Lab 10"}' \
+            http://127.0.0.1:5095/api/equipment)
+          test "$POST_STATUS" = '201'
+          grep -q '"isAvailable":true' /tmp/created.json
+          grep -qi '^location: .*api/equipment/' /tmp/created.headers
+          INVALID_STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' -d '{"name":"","room":"Lab 10"}' \
+            http://127.0.0.1:5095/api/equipment)
+          test "$INVALID_STATUS" = '400'
+          echo 'All PostgreSQL and API checks passed.'
