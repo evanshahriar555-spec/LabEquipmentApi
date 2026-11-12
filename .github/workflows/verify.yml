@@ -1,0 +1,61 @@
+name: Build and test LabEquipmentApi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: pass
+          POSTGRES_DB: lab_equipment
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      ConnectionStrings__LabDbConnection: Host=localhost;Port=5432;Database=lab_equipment;Username=postgres;Password=pass
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore project packages
+        run: dotnet restore LabEquipmentApi.slnx
+      - name: Build the project
+        run: dotnet build LabEquipmentApi.slnx --no-restore --configuration Release
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.11
+      - name: Apply initial migration to PostgreSQL
+        run: dotnet ef database update
+      - name: Start HTTP API and check seeded endpoints
+        shell: bash
+        run: |
+          export ASPNETCORE_URLS=http://127.0.0.1:5095
+          export ASPNETCORE_ENVIRONMENT=Development
+          dotnet run --no-build --configuration Release --no-launch-profile > /tmp/lab-api.log 2>&1 &
+          API_PID=$!
+          trap 'kill "$API_PID" 2>/dev/null || true; cat /tmp/lab-api.log' EXIT
+          for attempt in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:5095/api/equipment > /tmp/equipment.json; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:5095/api/equipment/1 | grep -q 'Projector'
+          curl --fail --silent http://127.0.0.1:5095/api/equipment/available | grep -q 'Monitor'
+          curl --fail --silent http://127.0.0.1:5095/api/equipment/room-summary | grep -q 'Lab 10'
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:5095/api/equipment/999)" = "404"
+          echo 'All read-only API checks passed.'
