@@ -42,6 +42,25 @@ public class EquipmentController : ControllerBase
         return Ok(available);
     }
 
+    // Optional: GET /api/equipment/room-summary
+    [HttpGet("room-summary")]
+    public async Task<ActionResult<IEnumerable<RoomSummaryResponse>>> GetRoomSummary()
+    {
+        var summary = await _context.EquipmentItems
+            .AsNoTracking()
+            .GroupBy(e => e.Room)
+            .Select(g => new RoomSummaryResponse
+            {
+                Room = g.Key,
+                TotalCount = g.Count(),
+                AvailableCount = g.Count(e => e.IsAvailable)
+            })
+            .OrderBy(x => x.Room)
+            .ToListAsync();
+
+        return Ok(summary);
+    }
+
     // GET: api/equipment/5
     [HttpGet("{id:int}")]
     public async Task<ActionResult<Equipment>> GetEquipment(int id)
