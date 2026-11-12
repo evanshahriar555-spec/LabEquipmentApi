@@ -1,0 +1,24 @@
+# .NET and Visual Studio
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+TestResults/
+[Dd]ebug/
+[Rr]elease/
+*.nupkg
+*.snupkg
+
+# IDEs and temporary files
+.idea/
+.vscode/
+*.tmp
+*.log
+*.bak
+
+# Configuration overrides containing credentials
+appsettings.Local.json
+appsettings.*.Local.json
+.env
+.env.*
