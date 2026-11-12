@@ -2,6 +2,7 @@ using LabEquipmentApi.Contracts.Equipment;
 using LabEquipmentApi.Data;
 using Mapster;
 using LabEquipmentApi.Domain;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,10 +13,12 @@ namespace LabEquipmentApi.Controllers;
 public class EquipmentController : ControllerBase
 {
     private readonly LabDbContext _context;
+    private readonly IValidator<CreateEquipmentRequest> _createValidator;
 
-    public EquipmentController(LabDbContext context)
+    public EquipmentController(LabDbContext context, IValidator<CreateEquipmentRequest> createValidator)
     {
         _context = context;
+        _createValidator = createValidator;
     }
 
     // GET: api/equipment
@@ -76,10 +79,27 @@ public class EquipmentController : ControllerBase
         return NoContent();
     }
 
-    // POST: api/equipment (will be replaced with a validated DTO in Part 5)
+    // POST: api/equipment — a safe request DTO plus FluentValidation
     [HttpPost]
-    public async Task<ActionResult<Equipment>> PostEquipment(Equipment equipment)
+    public async Task<ActionResult<Equipment>> PostEquipment(CreateEquipmentRequest request)
     {
+        var validationResult = await _createValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+            foreach (var error in validationResult.Errors)
+            {
+                ModelState.AddModelError(error.PropertyName, error.ErrorMessage);
+            }
+            return ValidationProblem(ModelState);
+        }
+
+        var equipment = new Equipment
+        {
+            Name = request.Name,
+            Room = request.Room,
+            IsAvailable = true
+        };
+
         _context.EquipmentItems.Add(equipment);
         await _context.SaveChangesAsync();
         return CreatedAtAction(nameof(GetEquipment), new { id = equipment.Id }, equipment);
